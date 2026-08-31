@@ -45,6 +45,8 @@ public class MainActivity extends Activity {
     private static final String PREFS = "physiquiz_native";
     private static final String PREF_SITE = "site_url";
     private static final String PREF_AUTH = "auth_token";
+    private static final String PREF_CONFIG_JSON = "wp_app_config_json";
+    private static final String PREF_CONFIG_TIME = "wp_app_config_time";
 
     private SharedPreferences prefs;
     private ApiClient api;
@@ -87,11 +89,41 @@ public class MainActivity extends Activity {
         remoteConfig = new AppRemoteConfig(site);
 
         showBootSplash();
-        remoteConfig.load(json -> ui.post(() -> {
-            config = AppConfig.fromJson(json);
+        remoteConfig.load(result -> ui.post(() -> handleRemoteConfig(result, true)));
+    }
+
+    private void handleRemoteConfig(AppRemoteConfig.Result result, boolean firstBoot) {
+        if (result.success) {
+            config = AppConfig.fromJson(result.json);
+            prefs.edit().putString(PREF_CONFIG_JSON, result.json.toString()).putLong(PREF_CONFIG_TIME, System.currentTimeMillis()).apply();
             applyTheme();
             bootWithConfig();
-        }));
+            return;
+        }
+        String cached = prefs.getString(PREF_CONFIG_JSON, "");
+        if (!cached.isEmpty()) {
+            try {
+                config = AppConfig.fromJson(new JSONObject(cached));
+                applyTheme();
+                bootWithConfig();
+                toast("تنظیمات جدید وردپرس دریافت نشد؛ آخرین تنظیمات ذخیره‌شده نمایش داده شد.");
+                return;
+            } catch (Exception ignored) { }
+        }
+        showConfigError(result.error, result.status);
+    }
+
+    private void showConfigError(String error, int status) {
+        LinearLayout box = column();
+        box.setGravity(Gravity.CENTER);
+        box.setPadding(dp(28), dp(28), dp(28), dp(28));
+        box.setBackgroundColor(background);
+        TextView h = text("اتصال به تنظیمات PhysiQuiz برقرار نشد", 22, Color.rgb(15,23,42), true);
+        h.setGravity(Gravity.CENTER); box.addView(h, matchWrap());
+        String detail = "اپلیکیشن نتوانست تنظیمات را از وردپرس دریافت کند." + (status > 0 ? " (HTTP " + status + ")" : "");
+        TextView p = bodyText(detail); p.setGravity(Gravity.CENTER); p.setPadding(0,dp(12),0,dp(20)); box.addView(p, matchWrap());
+        Button retry = primaryButton("تلاش دوباره"); retry.setOnClickListener(v -> retryBoot()); box.addView(retry, new LinearLayout.LayoutParams(dp(220), dp(58)));
+        FrameLayout wrap = new FrameLayout(this); wrap.addView(box, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)); setContentView(wrap);
     }
 
     private void showBootSplash() {
@@ -140,11 +172,7 @@ public class MainActivity extends Activity {
 
     private void retryBoot() {
         showBootSplash();
-        remoteConfig.load(json -> ui.post(() -> {
-            config = AppConfig.fromJson(json);
-            applyTheme();
-            bootWithConfig();
-        }));
+        remoteConfig.load(result -> ui.post(() -> handleRemoteConfig(result, false)));
     }
 
     private void showBlockingScreen(String title, String message, Runnable onAction) {
@@ -234,6 +262,20 @@ public class MainActivity extends Activity {
     }
 
     private void refreshCurrent() {
+        remoteConfig.load(result -> ui.post(() -> {
+            if (result.success) {
+                config = AppConfig.fromJson(result.json);
+                prefs.edit().putString(PREF_CONFIG_JSON, result.json.toString()).putLong(PREF_CONFIG_TIME, System.currentTimeMillis()).apply();
+                applyTheme();
+                toast("تنظیمات جدید از وردپرس اعمال شد.");
+            } else {
+                toast("دریافت تنظیمات وردپرس ناموفق بود.");
+            }
+            refreshSectionOnly();
+        }));
+    }
+
+    private void refreshSectionOnly() {
         CharSequence t = topTitle.getText();
         if ("آزمون‌ها".contentEquals(t)) showExams();
         else if ("نتایج".contentEquals(t)) showResults();
