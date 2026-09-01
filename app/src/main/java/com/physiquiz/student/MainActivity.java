@@ -129,10 +129,22 @@ public class MainActivity extends Activity {
     private void showBootSplash() {
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(background);
+        LinearLayout box = column();
+        box.setGravity(Gravity.CENTER);
+        box.setPadding(dp(28), dp(28), dp(28), dp(28));
+        TextView logo = text("PHYSI
+QUIZ", 30, accent, true);
+        logo.setGravity(Gravity.CENTER);
+        box.addView(logo, matchWrap());
+        TextView title = text(config.appName == null || config.appName.trim().isEmpty() ? "فیزیکوییز" : config.appName, 20, Color.rgb(15,23,42), true);
+        title.setGravity(Gravity.CENTER); title.setPadding(0,dp(12),0,dp(8));
+        box.addView(title, matchWrap());
+        TextView sub = text("سامانه هوشمند آزمون و یادگیری", 14, Color.rgb(100,116,139), false);
+        sub.setGravity(Gravity.CENTER); box.addView(sub, matchWrap());
         ProgressBar pb = new ProgressBar(this);
-        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(dp(50), dp(50));
-        lp.gravity = Gravity.CENTER;
-        root.addView(pb, lp);
+        LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(dp(44),dp(44)); pp.topMargin=dp(28);
+        box.addView(pb, pp);
+        root.addView(box, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         setContentView(root);
     }
 
@@ -215,7 +227,7 @@ public class MainActivity extends Activity {
         topBar.setPadding(dp(16), dp(10), dp(16), dp(10));
         topBar.setBackgroundColor(Color.WHITE);
         topBar.setElevation(dp(2));
-        topTitle = text(config.appName, 19, Color.rgb(15, 23, 42), true);
+        topTitle = text(config.appName + "  •", 19, Color.rgb(15, 23, 42), true);
         topBar.addView(topTitle, new LinearLayout.LayoutParams(0, dp(46), 1));
         Button refresh = smallButton("↻");
         refresh.setOnClickListener(v -> refreshCurrent());
@@ -230,11 +242,11 @@ public class MainActivity extends Activity {
         bottomBar.setPadding(dp(6), dp(8), dp(6), dp(10));
         bottomBar.setBackgroundColor(Color.WHITE);
         bottomBar.setElevation(dp(4));
-        addNav("🏠", "خانه", this::showHome);
-        addNav("📝", "آزمون‌ها", this::showExams);
-        addNav("📊", "نتایج", this::showResults);
-        addNav("📁", "فایل‌ها", this::showFiles);
-        addNav("👤", "پروفایل", this::showProfile);
+        addNav("⌂", "خانه", this::showHome);
+        addNav("✓", "آزمون‌ها", this::showExams);
+        addNav("◔", "نتایج", this::showResults);
+        addNav("▣", "فایل‌ها", this::showFiles);
+        addNav("●", "پروفایل", this::showProfile);
         root.addView(bottomBar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         loading = new ProgressBar(this);
@@ -292,64 +304,46 @@ public class MainActivity extends Activity {
         if (config.blockScreenshots) getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
 
         ScrollView scroll = new ScrollView(this);
-        LinearLayout box = column();
-        box.setPadding(dp(24), dp(46), dp(24), dp(30));
-        TextView mark = text("PQ", 30, accent, true);
-        mark.setGravity(Gravity.CENTER);
-        box.addView(mark, matchWrap());
-        TextView h = text("ورود به " + config.appName, 27, Color.rgb(15, 23, 42), true);
-        h.setGravity(Gravity.CENTER);
-        h.setPadding(0, dp(10), 0, dp(8));
-        box.addView(h, matchWrap());
-        TextView p = text("ورود، آزمون‌ها، پاسخ‌ها و نتایج از این نسخه به‌صورت Native داخل خود اپ انجام می‌شود.", 14, Color.rgb(100, 116, 139), false);
-        p.setGravity(Gravity.CENTER);
-        p.setPadding(dp(10), 0, dp(10), dp(18));
-        box.addView(p, matchWrap());
+        scroll.setFillViewport(true);
+        LinearLayout page = column();
+        page.setPadding(dp(20), dp(28), dp(20), dp(28));
+        page.setBackgroundColor(background);
 
-        EditText username = input("نام کاربری یا ایمیل");
-        username.setSingleLine(true);
-        box.addView(username, matchWrapMargin(0, 8));
-        EditText password = input("رمز عبور");
-        password.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        password.setSingleLine(true);
-        box.addView(password, matchWrapMargin(0, 6));
+        LinearLayout brand = card();
+        GradientDrawable brandBg = new GradientDrawable();
+        brandBg.setColor(accent); brandBg.setCornerRadius(dp(28));
+        brand.setBackground(brandBg); brand.setPadding(dp(22),dp(24),dp(22),dp(24));
+        TextView badge = text("PHYSIQUIZ", 24, Color.WHITE, true); badge.setGravity(Gravity.CENTER);
+        brand.addView(badge, matchWrap());
+        TextView brandSub = text("آموزش • آزمون • پیشرفت", 13, Color.WHITE, false); brandSub.setGravity(Gravity.CENTER); brandSub.setPadding(0,dp(8),0,0);
+        brand.addView(brandSub, matchWrap());
+        page.addView(brand, matchWrapMargin(0,18));
 
-        TextView forgot = text("فراموشی رمز عبور؟", 13, accent, true);
-        forgot.setGravity(Gravity.LEFT);
-        forgot.setPadding(dp(4), dp(4), dp(4), dp(14));
-        forgot.setOnClickListener(v -> showForgotPasswordDialog(username.getText().toString().trim()));
-        box.addView(forgot, matchWrap());
+        TextView h = text("خوش آمدی 👋", 28, Color.rgb(15,23,42), true);
+        page.addView(h, matchWrap());
+        TextView p = text("برای ورود به داشبورد آموزشی و آزمون‌های خود، اطلاعات حسابت را وارد کن.", 14, Color.rgb(100,116,139), false);
+        p.setPadding(0,dp(8),0,dp(18)); page.addView(p, matchWrap());
 
-        Button login = primaryButton("ورود به حساب");
-        box.addView(login, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(58)));
-        TextView help = text("اپ فقط به REST API وردپرس متصل می‌شود؛ هیچ صفحه‌ای از سایت داخل اپ باز نمی‌شود.", 12, Color.rgb(100, 116, 139), false);
-        help.setGravity(Gravity.CENTER);
-        help.setPadding(dp(8), dp(16), dp(8), 0);
-        box.addView(help, matchWrap());
+        LinearLayout form = card(); form.setPadding(dp(18),dp(18),dp(18),dp(18));
+        TextView ulabel=text("نام کاربری یا ایمیل",13,Color.rgb(51,65,85),true); form.addView(ulabel,matchWrap());
+        EditText username=input("مثلاً student@example.com"); username.setSingleLine(true); form.addView(username,matchWrapMargin(0,8));
+        TextView plabel=text("رمز عبور",13,Color.rgb(51,65,85),true); plabel.setPadding(0,dp(14),0,0); form.addView(plabel,matchWrap());
+        EditText password=input("رمز عبور خود را وارد کنید"); password.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD); password.setSingleLine(true); form.addView(password,matchWrapMargin(0,8));
+        TextView forgot=text("رمز عبور را فراموش کرده‌ام",13,accent,true); forgot.setGravity(Gravity.RIGHT); forgot.setPadding(0,dp(10),0,dp(10)); forgot.setOnClickListener(v->showForgotPasswordDialog(username.getText().toString().trim())); form.addView(forgot,matchWrap());
+        Button login=primaryButton("ورود به حساب ←"); form.addView(login,new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,dp(56)));
+        page.addView(form,matchWrapMargin(0,18));
+        TextView foot=text("حساب کاربری شما مستقیماً از PhysiQuiz مدیریت می‌شود.",12,Color.rgb(100,116,139),false); foot.setGravity(Gravity.CENTER); page.addView(foot,matchWrap());
 
         login.setOnClickListener(v -> {
-            if (username.getText().toString().trim().isEmpty() || password.getText().toString().isEmpty()) {
-                toast("نام کاربری و رمز عبور را وارد کنید."); return;
-            }
-            runApi(() -> {
-                JSONObject body = new JSONObject();
-                body.put("username", username.getText().toString().trim());
-                body.put("password", password.getText().toString());
-                body.put("device", "Android " + android.os.Build.VERSION.RELEASE + " / " + android.os.Build.MODEL);
-                return api.post("/wp-json/physiquiz/v1/mobile/login", body);
-            }, json -> {
-                String token = json.optString("token", "");
-                if (token.isEmpty()) { toast("توکن ورود از سرور دریافت نشد."); return; }
-                prefs.edit().putString(PREF_SITE, api.getBaseUrl()).putString(PREF_AUTH, token).apply();
-                api.setAuthToken(token);
-                topBar.setVisibility(View.VISIBLE);
-                bottomBar.setVisibility(View.VISIBLE);
-                showHome();
+            if(username.getText().toString().trim().isEmpty()||password.getText().toString().isEmpty()){toast("نام کاربری و رمز عبور را وارد کنید.");return;}
+            login.setEnabled(false); login.setText("در حال ورود...");
+            runApi(() -> { JSONObject body=new JSONObject(); body.put("username",username.getText().toString().trim()); body.put("password",password.getText().toString()); body.put("device","Android "+android.os.Build.VERSION.RELEASE+" / "+android.os.Build.MODEL); return api.post("/wp-json/physiquiz/v1/mobile/login",body); }, json -> {
+                login.setEnabled(true); login.setText("ورود به حساب ←");
+                String token=json.optString("token",""); if(token.isEmpty()){toast("توکن ورود از سرور دریافت نشد.");return;}
+                prefs.edit().putString(PREF_SITE,api.getBaseUrl()).putString(PREF_AUTH,token).apply(); api.setAuthToken(token); topBar.setVisibility(View.VISIBLE); bottomBar.setVisibility(View.VISIBLE); showHome();
             });
         });
-
-        scroll.addView(box);
-        setScreen(scroll);
+        scroll.addView(page); setScreen(scroll);
     }
 
     private void showForgotPasswordDialog(String prefill) {
@@ -389,7 +383,7 @@ public class MainActivity extends Activity {
                 page.addView(bannerImage(config.bannerUrl), matchWrapMargin(0, 14));
             }
 
-            page.addView(hero("سلام " + name, "داشبورد شخصی " + config.appName + "؛ بدون WebView و بدون وابستگی به برگه سایت.", name), matchWrapMargin(0, 14));
+            page.addView(hero("سلام " + name + " 👋", "امروز یک قدم دیگر به تسلط بر فیزیک نزدیک‌تر شو.", name), matchWrapMargin(0, 14));
 
             if (config.cards != null && config.cards.length() > 0) {
                 for (int i = 0; i < config.cards.length(); i++) {
