@@ -132,8 +132,7 @@ public class MainActivity extends Activity {
         LinearLayout box = column();
         box.setGravity(Gravity.CENTER);
         box.setPadding(dp(28), dp(28), dp(28), dp(28));
-        TextView logo = text("PHYSI
-QUIZ", 30, accent, true);
+        TextView logo = text("PHYSI QUIZ", 30, accent, true);
         logo.setGravity(Gravity.CENTER);
         box.addView(logo, matchWrap());
         TextView title = text(config.appName == null || config.appName.trim().isEmpty() ? "فیزیکوییز" : config.appName, 20, Color.rgb(15,23,42), true);
