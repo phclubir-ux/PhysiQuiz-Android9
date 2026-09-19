@@ -4,12 +4,17 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.res.ColorStateList;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
+import android.graphics.PorterDuff;
 import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
 import android.net.Uri;
+import android.util.LruCache;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -58,6 +63,15 @@ public class MainActivity extends Activity {
     private int accent = Color.rgb(37, 88, 221);
     private int background = Color.rgb(246, 248, 252);
 
+    private Typeface fontRegular = Typeface.DEFAULT;
+    private Typeface fontBold = Typeface.DEFAULT_BOLD;
+    /** Small in-memory-only cache so re-visiting a screen in the same session doesn't re-download the same banner/card images. */
+    private final LruCache<String, Bitmap> imageCache = new LruCache<>(20);
+    private final java.util.Map<String, LinearLayout> navItems = new java.util.HashMap<>();
+    private final java.util.Map<String, ImageView> navIcons = new java.util.HashMap<>();
+    private final java.util.Map<String, TextView> navLabels = new java.util.HashMap<>();
+    private static final int NAV_INACTIVE = Color.rgb(100, 116, 139);
+
     private FrameLayout content;
     private LinearLayout topBar;
     private LinearLayout bottomBar;
@@ -82,6 +96,7 @@ public class MainActivity extends Activity {
         getWindow().setStatusBarColor(Color.WHITE);
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
         prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        loadFonts();
         String bundled = getString(R.string.default_site_url).trim();
         String site = prefs.getString(PREF_SITE, bundled);
         String token = prefs.getString(PREF_AUTH, "");
@@ -228,7 +243,13 @@ public class MainActivity extends Activity {
         topBar.setElevation(dp(2));
         topTitle = text(config.appName + "  •", 19, Color.rgb(15, 23, 42), true);
         topBar.addView(topTitle, new LinearLayout.LayoutParams(0, dp(46), 1));
-        Button refresh = smallButton("↻");
+        Button refresh = smallButton("");
+        refresh.setBackground(withRipple(null, 20, 0x1F000000));
+        Drawable refreshIcon = getDrawable(R.drawable.ic_refresh);
+        if (refreshIcon != null) {
+            refreshIcon.setColorFilter(Color.rgb(51, 65, 85), PorterDuff.Mode.SRC_IN);
+            refresh.setCompoundDrawablesWithIntrinsicBounds(null, refreshIcon, null, null);
+        }
         refresh.setOnClickListener(v -> refreshCurrent());
         topBar.addView(refresh, new LinearLayout.LayoutParams(dp(48), dp(44)));
         root.addView(topBar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -241,11 +262,11 @@ public class MainActivity extends Activity {
         bottomBar.setPadding(dp(6), dp(8), dp(6), dp(10));
         bottomBar.setBackgroundColor(Color.WHITE);
         bottomBar.setElevation(dp(4));
-        addNav("⌂", "خانه", this::showHome);
-        addNav("✓", "آزمون‌ها", this::showExams);
-        addNav("◔", "نتایج", this::showResults);
-        addNav("▣", "فایل‌ها", this::showFiles);
-        addNav("●", "پروفایل", this::showProfile);
+        addNav(R.drawable.ic_nav_home, "خانه", this::showHome);
+        addNav(R.drawable.ic_nav_exams, "آزمون‌ها", this::showExams);
+        addNav(R.drawable.ic_nav_results, "نتایج", this::showResults);
+        addNav(R.drawable.ic_nav_files, "فایل‌ها", this::showFiles);
+        addNav(R.drawable.ic_nav_profile, "پروفایل", this::showProfile);
         root.addView(bottomBar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         loading = new ProgressBar(this);
@@ -258,18 +279,37 @@ public class MainActivity extends Activity {
         setContentView(overlay);
     }
 
-    private void addNav(String icon, String label, Runnable action) {
+    private void addNav(int iconRes, String label, Runnable action) {
         LinearLayout col = column();
         col.setGravity(Gravity.CENTER);
-        TextView iconView = text(icon, 17, Color.rgb(51, 65, 85), false);
-        iconView.setGravity(Gravity.CENTER);
-        col.addView(iconView, matchWrap());
-        TextView labelView = text(label, 11, Color.rgb(51, 65, 85), false);
+        ImageView iconView = new ImageView(this);
+        iconView.setImageResource(iconRes);
+        iconView.setColorFilter(NAV_INACTIVE, PorterDuff.Mode.SRC_IN);
+        int iconSize = dp(22);
+        LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(iconSize, iconSize);
+        col.addView(iconView, iconLp);
+        TextView labelView = text(label, 11, NAV_INACTIVE, false);
         labelView.setGravity(Gravity.CENTER);
-        col.addView(labelView, matchWrap());
+        col.addView(labelView, matchWrapMargin(3, 0));
         col.setOnClickListener(v -> action.run());
         col.setPadding(dp(2), dp(4), dp(2), dp(2));
+        addRippleFeedback(col, 14);
         bottomBar.addView(col, new LinearLayout.LayoutParams(0, dp(52), 1));
+        navItems.put(label, col);
+        navIcons.put(label, iconView);
+        navLabels.put(label, labelView);
+    }
+
+    /** Highlights the bottom-nav item matching the current section title (accent color); others stay neutral. Silently does nothing for sub-pages (e.g. "جزئیات آزمون") that have no matching tab. */
+    private void updateActiveNav(String title) {
+        for (String key : navIcons.keySet()) {
+            boolean active = key.equals(title);
+            int color = active ? accent : NAV_INACTIVE;
+            navIcons.get(key).setColorFilter(color, PorterDuff.Mode.SRC_IN);
+            TextView lbl = navLabels.get(key);
+            lbl.setTextColor(color);
+            lbl.setTypeface(active ? fontBold : fontRegular);
+        }
     }
 
     private void refreshCurrent() {
@@ -449,6 +489,7 @@ public class MainActivity extends Activity {
         }
         if (!link.isEmpty()) {
             card.setOnClickListener(v -> openExternal(link));
+            addRippleFeedback(card, 18);
         }
         page.addView(card, matchWrapMargin(0, 10));
     }
@@ -826,6 +867,7 @@ public class MainActivity extends Activity {
         topBar.setVisibility(View.VISIBLE);
         bottomBar.setVisibility(View.VISIBLE);
         topTitle.setText(title);
+        updateActiveNav(title);
         setScreen(empty("در حال دریافت اطلاعات…"));
     }
 
@@ -935,7 +977,9 @@ public class MainActivity extends Activity {
 
     private void setScreen(View view) {
         content.removeAllViews();
+        view.setAlpha(0f);
         content.addView(view, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        view.animate().alpha(1f).setDuration(160).start();
     }
 
     private LinearLayout pageColumn() {
@@ -985,6 +1029,9 @@ public class MainActivity extends Activity {
     }
 
     private void loadImageInto(String url, ImageView iv) {
+        Bitmap cached = imageCache.get(url);
+        if (cached != null) { iv.setImageBitmap(cached); return; }
+        iv.setAlpha(0f);
         io.execute(() -> {
             try {
                 HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
@@ -992,9 +1039,13 @@ public class MainActivity extends Activity {
                 c.setReadTimeout(8000);
                 Bitmap bmp = BitmapFactory.decodeStream(c.getInputStream());
                 c.disconnect();
-                if (bmp != null) ui.post(() -> iv.setImageBitmap(bmp));
+                if (bmp != null) {
+                    imageCache.put(url, bmp);
+                    ui.post(() -> { iv.setImageBitmap(bmp); iv.animate().alpha(1f).setDuration(220).start(); });
+                }
             } catch (Exception ignored) {
-                // Image failing to load should never block the app — just leave it blank.
+                // Image failing to load should never block the app — just leave the placeholder background visible.
+                ui.post(() -> iv.animate().alpha(1f).setDuration(150).start());
             }
         });
     }
@@ -1035,7 +1086,7 @@ public class MainActivity extends Activity {
         t.setText(letter);
         t.setTextColor(accent);
         t.setTextSize(18);
-        t.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        t.setTypeface(fontBold);
         t.setGravity(Gravity.CENTER);
         GradientDrawable d = new GradientDrawable();
         d.setShape(GradientDrawable.OVAL);
@@ -1103,7 +1154,7 @@ public class MainActivity extends Activity {
         t.setTextSize(sp);
         t.setTextColor(color);
         t.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
-        if (bold) t.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        t.setTypeface(bold ? fontBold : fontRegular);
         return t;
     }
 
@@ -1111,6 +1162,7 @@ public class MainActivity extends Activity {
         EditText e = new EditText(this);
         e.setHint(hint);
         e.setTextSize(15);
+        e.setTypeface(fontRegular);
         e.setTextColor(Color.rgb(15, 23, 42));
         e.setHintTextColor(Color.rgb(148, 163, 184));
         e.setPadding(dp(14), dp(11), dp(14), dp(11));
@@ -1125,8 +1177,8 @@ public class MainActivity extends Activity {
         b.setAllCaps(false);
         b.setTextSize(15);
         b.setTextColor(Color.WHITE);
-        b.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        b.setBackground(roundRect(accent, 18, Color.TRANSPARENT, 0));
+        b.setTypeface(fontBold);
+        b.setBackground(withRipple(roundRect(accent, 18, Color.TRANSPARENT, 0), 18, 0x40FFFFFF));
         b.setElevation(dp(3));
         return b;
     }
@@ -1137,7 +1189,8 @@ public class MainActivity extends Activity {
         b.setAllCaps(false);
         b.setTextSize(15);
         b.setTextColor(accent);
-        b.setBackground(roundRect(Color.WHITE, 18, Color.rgb(191, 219, 254), 1));
+        b.setTypeface(fontBold);
+        b.setBackground(withRipple(roundRect(Color.WHITE, 18, Color.rgb(191, 219, 254), 1), 18, adjustAlpha(accent, 0x33)));
         return b;
     }
 
@@ -1147,7 +1200,8 @@ public class MainActivity extends Activity {
         b.setAllCaps(false);
         b.setTextSize(12);
         b.setTextColor(Color.rgb(51, 65, 85));
-        b.setBackgroundColor(Color.TRANSPARENT);
+        b.setTypeface(fontRegular);
+        b.setBackground(withRipple(null, 20, 0x1F000000));
         b.setPadding(dp(2), 0, dp(2), 0);
         return b;
     }
@@ -1158,6 +1212,33 @@ public class MainActivity extends Activity {
         d.setCornerRadius(dp(radius));
         if (strokeWidth > 0) d.setStroke(dp(strokeWidth), stroke);
         return d;
+    }
+
+    /** Loads the bundled Vazirmatn fonts once; silently falls back to the system font if the asset is ever missing. */
+    private void loadFonts() {
+        try { fontRegular = Typeface.createFromAsset(getAssets(), "fonts/Vazirmatn-Regular.ttf"); } catch (Exception ignored) { }
+        try { fontBold = Typeface.createFromAsset(getAssets(), "fonts/Vazirmatn-Bold.ttf"); } catch (Exception ignored) { }
+    }
+
+    /**
+     * Wraps a drawable with a ripple touch-feedback layer clipped to a rounded-rect mask, using
+     * the stock Android RippleDrawable (API 21+, no external dependency). Pass content=null for a
+     * "ripple-only" overlay meant to sit on top of an existing background via setForeground().
+     */
+    private Drawable withRipple(Drawable content, int radiusDp, int rippleColor) {
+        GradientDrawable mask = new GradientDrawable();
+        mask.setColor(Color.WHITE);
+        mask.setCornerRadius(dp(radiusDp));
+        return new RippleDrawable(ColorStateList.valueOf(rippleColor), content, mask);
+    }
+
+    /** Adds a subtle ripple on top of a view's existing background/content without altering it (e.g. a whole clickable card). */
+    private void addRippleFeedback(View v, int radiusDp) {
+        v.setForeground(withRipple(null, radiusDp, adjustAlpha(accent, 0x26)));
+    }
+
+    private int adjustAlpha(int color, int alpha) {
+        return (color & 0x00FFFFFF) | (alpha << 24);
     }
 
     private LinearLayout.LayoutParams matchWrap() { return new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT); }
